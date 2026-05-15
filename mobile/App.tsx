@@ -1,19 +1,23 @@
-import { CameraView, useCameraPermissions } from "expo-camera";
+import { useCameraPermissions } from "expo-camera";
 import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useCameraPermission } from "react-native-vision-camera";
 
+import { CameraHost } from "./src/camera/CameraHost";
+import { isExpoGo } from "./src/camera/expoGo";
+import type { HudCameraHandle } from "./src/camera/types";
 import { ConnectionBar } from "./src/components/ConnectionBar";
 import { DEFAULT_BACKEND_HOST } from "./src/config";
 import { useHudStream } from "./src/hooks/useHudStream";
 
 function HudScreen() {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [cameraReady, setCameraReady] = useState(false);
+  const cameraRef = useRef<HudCameraHandle>(null);
+  const visionPermission = useCameraPermission();
+  const [expoPermission, requestExpoPermission] = useCameraPermissions();
   const {
-    cameraRef,
     serverHost,
     setServerHost,
     connectionState,
@@ -22,29 +26,47 @@ function HudScreen() {
     isStreaming,
     framesSent,
     captureFps,
+    cameraReady,
+    setCameraReady,
     connect,
     disconnect,
     startStreaming,
     stopStreaming,
-  } = useHudStream(cameraReady);
+  } = useHudStream(cameraRef);
 
   useEffect(() => {
     setServerHost(DEFAULT_BACKEND_HOST);
   }, [setServerHost]);
 
-  if (!permission) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.muted}>Requesting camera permission…</Text>
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (!isExpoGo() && !visionPermission.hasPermission) {
+      void visionPermission.requestPermission();
+    }
+  }, [visionPermission]);
 
-  if (!permission.granted) {
+  if (isExpoGo()) {
+    if (!expoPermission) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.muted}>Requesting camera permission…</Text>
+        </View>
+      );
+    }
+    if (!expoPermission.granted) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.text}>Camera access is required for SkulVision.</Text>
+          <Text style={styles.link} onPress={() => void requestExpoPermission()}>
+            Grant permission
+          </Text>
+        </View>
+      );
+    }
+  } else if (!visionPermission.hasPermission) {
     return (
       <View style={styles.center}>
         <Text style={styles.text}>Camera access is required for SkulVision.</Text>
-        <Text style={styles.link} onPress={() => void requestPermission()}>
+        <Text style={styles.link} onPress={() => void visionPermission.requestPermission()}>
           Grant permission
         </Text>
       </View>
@@ -55,11 +77,10 @@ function HudScreen() {
     <View style={styles.root}>
       <StatusBar style="light" hidden={isStreaming} />
 
-      <CameraView
+      <CameraHost
         ref={cameraRef}
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        onCameraReady={() => setCameraReady(true)}
+        isActive
+        onReady={() => setCameraReady(true)}
       />
 
       {hudUri ? (
@@ -72,7 +93,6 @@ function HudScreen() {
         />
       ) : null}
 
-      {/* Top-left Menu — stays above keyboard */}
       <ConnectionBar
         serverHost={serverHost}
         onChangeHost={setServerHost}

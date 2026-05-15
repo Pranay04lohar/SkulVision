@@ -1,12 +1,13 @@
-import { CameraView } from "expo-camera";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
-import { JPEG_QUALITY, MIN_CAPTURE_GAP_MS } from "../config";
+import type { HudCameraHandle } from "../camera/types";
+import { TARGET_CAPTURE_FPS } from "../config";
 import { ConnectionState, SkulVisionSocket } from "../services/skulVisionSocket";
 import { sleep } from "../utils/bytes";
 
-export function useHudStream(cameraReady: boolean) {
-  const cameraRef = useRef<CameraView>(null);
+const FRAME_INTERVAL_MS = Math.ceil(1000 / TARGET_CAPTURE_FPS);
+
+export function useHudStream(cameraRef: RefObject<HudCameraHandle | null>) {
   const socketRef = useRef<SkulVisionSocket | null>(null);
   const streamingRef = useRef(false);
   const wantStreamRef = useRef(false);
@@ -19,6 +20,7 @@ export function useHudStream(cameraReady: boolean) {
   const [statusMessage, setStatusMessage] = useState("");
   const [hudUri, setHudUri] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const [framesSent, setFramesSent] = useState(0);
   const [captureFps, setCaptureFps] = useState(0);
 
@@ -94,7 +96,6 @@ export function useHudStream(cameraReady: boolean) {
     setIsStreaming(false);
   }, []);
 
-  // Auto-start after Connect → Start HUD if camera was still initializing
   useEffect(() => {
     if (
       wantStreamRef.current &&
@@ -108,6 +109,7 @@ export function useHudStream(cameraReady: boolean) {
     }
   }, [cameraReady, connectionState, isStreaming]);
 
+  // Video-style pump: snapshot from preview at TARGET_CAPTURE_FPS
   useEffect(() => {
     if (!isStreaming || connectionState !== "connected" || !cameraReady) {
       return;
@@ -121,50 +123,34 @@ export function useHudStream(cameraReady: boolean) {
         const t0 = Date.now();
 
         try {
-          const camera = cameraRef.current;
           const socket = socketRef.current;
-          if (!camera) {
-            await sleep(100);
-            continue;
-          }
-          if (socket?.state !== "connected") {
-            await sleep(100);
+          const camera = cameraRef.current;
+          if (!camera || socket?.state !== "connected") {
+            await sleep(50);
             continue;
           }
 
-          const photo = await camera.takePictureAsync({
-            quality: JPEG_QUALITY,
-            skipProcessing: false,
-            shutterSound: false,
-            base64: true,
-            exif: false,
-          });
-
+          const bytes = await camera.captureFrame();
           captureErrors = 0;
 
-          if (photo?.base64) {
-            socket.sendFrameBase64(photo.base64);
-            bumpFpsCounter();
-          } else if (photo?.uri) {
-            // Fallback: some devices omit base64 even when requested
-            const res = await fetch(photo.uri);
-            const buf = await res.arrayBuffer();
-            socket.sendFrameBytes(new Uint8Array(buf));
+          if (bytes && bytes.length >= 100) {
+            socket.sendFrameBytes(bytes);
             bumpFpsCounter();
           }
         } catch (err) {
           captureErrors += 1;
           if (captureErrors === 1 || captureErrors % 10 === 0) {
             const msg =
-              err instanceof Error ? err.message : "Camera capture failed";
+              err instanceof Error ? err.message : "Frame capture failed";
             setStatusMessage(`Capture: ${msg}`);
           }
-          await sleep(200);
+          await sleep(150);
         }
 
         const elapsed = Date.now() - t0;
-        if (elapsed < MIN_CAPTURE_GAP_MS) {
-          await sleep(MIN_CAPTURE_GAP_MS - elapsed);
+        const wait = FRAME_INTERVAL_MS - elapsed;
+        if (wait > 0) {
+          await sleep(wait);
         }
       }
     };
@@ -174,10 +160,9 @@ export function useHudStream(cameraReady: boolean) {
     return () => {
       active = false;
     };
-  }, [isStreaming, connectionState, cameraReady, bumpFpsCounter]);
+  }, [isStreaming, connectionState, cameraReady, cameraRef, bumpFpsCounter]);
 
   return {
-    cameraRef,
     serverHost,
     setServerHost,
     connectionState,
@@ -186,6 +171,8 @@ export function useHudStream(cameraReady: boolean) {
     isStreaming,
     framesSent,
     captureFps,
+    cameraReady,
+    setCameraReady,
     connect,
     disconnect,
     startStreaming,

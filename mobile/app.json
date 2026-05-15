@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "SkulVision uses the camera for real-time HUD vision.",
+        "NSCameraUsageDescription": "SkulVision needs camera access for real-time HUD streaming.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }
@@ -28,8 +28,16 @@
       },
       "usesCleartextTraffic": true,
       "softwareKeyboardLayoutMode": "resize",
-      "permissions": ["CAMERA"],
-      "edgeToEdgeEnabled": true
+      "permissions": [
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.skulvision"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,6 +47,13 @@
         "expo-camera",
         {
           "cameraPermission": "SkulVision needs camera access for real-time HUD streaming."
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "SkulVision needs camera access for real-time HUD streaming.",
+          "enableMicrophonePermission": false
         }
       ]
     ]

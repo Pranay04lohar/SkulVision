@@ -9,11 +9,14 @@ export const BACKEND_PORT = 8000;
 export const DEFAULT_BACKEND_HOST =
   process.env.EXPO_PUBLIC_BACKEND_HOST ?? "192.168.0.106";
 
-/** JPEG quality 0–1 — balance of Wi-Fi speed vs detection detail. */
-export const JPEG_QUALITY = 0.55;
+/** Target send rate for the video-style snapshot pump. */
+export const TARGET_CAPTURE_FPS = 12;
 
-/** Minimum ms between capture attempts. */
-export const MIN_CAPTURE_GAP_MS = 50;
+/** VisionCamera takeSnapshot JPEG quality (0–100). */
+export const SNAPSHOT_QUALITY = 78;
+
+/** Expo Go fallback still-photo quality (0–1). */
+export const JPEG_QUALITY = 0.55;
 
 /**
  * Skip sending when the WebSocket send buffer is large (avoids lag buildup).
