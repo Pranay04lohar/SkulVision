@@ -112,11 +112,8 @@ class PipelineOrchestrator:
             context.ocr_result = self._get_cached_ocr(cache_key)
             self._schedule_background_ocr(frame, cache_key)
 
-        extra: dict[str, str] = {}
-        if context.detection_result:
-            extra["det"] = f"{context.detection_result.inference_time_ms:.0f}ms"
-
         context.mark_complete()
+        extra: dict[str, str] = {}
         if context.total_latency_ms is not None:
             extra["lat"] = f"{context.total_latency_ms:.0f}ms"
 

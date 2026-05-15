@@ -63,8 +63,12 @@ class Settings(BaseSettings):
     OVERLAY_ALPHA: float = 0.7
     OVERLAY_FONT_SCALE: float = 0.6
     OVERLAY_THICKNESS: int = 2
-    HUD_SHOW_FPS: bool = True
-    HUD_SHOW_INFERENCE_TIME: bool = True
+    HUD_STATS_FONT_SCALE: float = 0.58
+    HUD_PANEL_ALPHA: float = 0.95
+    # White stats card on video (FPS/DET/OCR) — off by default; blocks detection labels
+    HUD_SHOW_STATS_PANEL: bool = False
+    HUD_SHOW_FPS: bool = False
+    HUD_SHOW_INFERENCE_TIME: bool = False
 
     @field_validator("YOLO_CONFIDENCE_THRESHOLD", "YOLO_NMS_THRESHOLD", "OVERLAY_ALPHA", "OCR_MIN_CONFIDENCE")
     @classmethod

@@ -22,7 +22,6 @@ import asyncio
 from typing import Optional
 
 from backend.core.config import get_settings
-from backend.core.exceptions import FrameProcessingError
 from backend.core.logging_config import get_logger
 from backend.overlay.compositor import FrameCompositor
 from backend.pipeline.orchestrator import PipelineOrchestrator
@@ -73,7 +72,7 @@ class FrameProcessor:
         Dequeue and process one frame.
 
         Returns rendered JPEG bytes, or None if the queue is empty.
-        Raises FrameProcessingError if the frame is undecodable.
+        Returns None if the frame is undecodable.
         """
         if self._queue.empty():
             return None
@@ -89,7 +88,13 @@ class FrameProcessor:
         try:
             frame = self._compositor.decode_frame(raw_bytes)
         except ValueError as exc:
-            raise FrameProcessingError(f"Frame decode error: {exc}") from exc
+            logger.warning(
+                "frame_decode_failed",
+                client_id=self._client_id,
+                bytes=len(raw_bytes),
+                error=str(exc),
+            )
+            return None
 
         # Downscale to configured maximum dimension before inference
         frame = self._compositor.resize_max_dimension(

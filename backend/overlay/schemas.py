@@ -50,10 +50,13 @@ class OverlayConfig:
     show_detection_confidence: bool = True
     show_ocr_boxes: bool = True
     show_ocr_text: bool = True
-    show_hud_stats: bool = True
+    show_hud_stats: bool = False
     font_scale: float = 0.6
     thickness: int = 2
     alpha: float = 0.7
+    stats_font_scale: float = 0.72
+    stats_thickness: int = 2
+    panel_alpha: float = 0.75
 
 
 @dataclass

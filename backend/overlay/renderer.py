@@ -6,7 +6,7 @@ Design philosophy:
   - Minimal, tactical aesthetic: no decorative elements
   - Every drawn element serves an information purpose
   - Label backgrounds ensure readability on any background color
-  - FPS counter and inference times are always visible in top-left
+  - Optional stats panel (off by default — use mobile Menu for connection status)
 
 Rendering pipeline per frame:
   1. Copy input frame (never mutate in-place)
@@ -46,6 +46,9 @@ class HUDRenderer:
             font_scale=settings.OVERLAY_FONT_SCALE,
             thickness=settings.OVERLAY_THICKNESS,
             alpha=settings.OVERLAY_ALPHA,
+            stats_font_scale=settings.HUD_STATS_FONT_SCALE,
+            panel_alpha=settings.HUD_PANEL_ALPHA,
+            show_hud_stats=settings.HUD_SHOW_STATS_PANEL,
         )
         self._frame_count = 0
         self._fps_window_start = time.time()
@@ -142,6 +145,28 @@ class HUDRenderer:
                     _FONT, cfg.font_scale * 0.85, text_color, 1, _LINE,
                 )
 
+    def _stats_scale_for_frame(self, frame: np.ndarray) -> float:
+        """Readable on phone — matched to mobile Menu panel size."""
+        ref_w = 640.0
+        w = float(frame.shape[1])
+        scaled = self._config.stats_font_scale * (w / ref_w)
+        return max(0.52, min(0.68, scaled))
+
+    def _draw_menu_style_box(
+        self,
+        frame: np.ndarray,
+        x0: int,
+        y0: int,
+        box_w: int,
+        box_h: int,
+    ) -> None:
+        """White card + black border — same look as mobile Server IP panel."""
+        white = (250, 250, 250)
+        black = (17, 17, 17)
+        x1, y1 = x0 + box_w, y0 + box_h
+        cv2.rectangle(frame, (x0, y0), (x1, y1), white, cv2.FILLED)
+        cv2.rectangle(frame, (x0, y0), (x1, y1), black, 2, _LINE)
+
     def _draw_hud_panel(
         self,
         frame: np.ndarray,
@@ -149,35 +174,88 @@ class HUDRenderer:
         ocr: Optional[OCRFrame],
         extra_info: Optional[dict[str, str]],
     ) -> None:
-        primary = PALETTE["hud_primary"].as_tuple()
-        secondary = PALETTE["hud_secondary"].as_tuple()
-        line_height = 18
-        x, y = 8, 20
+        """
+        Stats card on the video — white box / black text like mobile Menu panel.
 
-        lines: list[tuple[str, tuple[int, int, int]]] = [
-            (f"FPS  {self._current_fps:.1f}", primary),
+        Placed top-right so it does not sit under the phone's top-left Menu overlay.
+        """
+        scale = self._stats_scale_for_frame(frame)
+        thickness = 2
+        padding = 10
+        line_gap = 6
+        margin = 10
+
+        black = (17, 17, 17)
+        gray = (80, 80, 80)
+        accent = (200, 130, 0)  # dark cyan/teal on white (BGR)
+
+        stat_lines: list[tuple[str, tuple[int, int, int]]] = [
+            (f"FPS  {self._current_fps:.1f}", accent),
         ]
-
         if df:
-            lines.append((f"DET  {df.count} obj  {df.inference_time_ms:.0f}ms", secondary))
-        if ocr:
-            if ocr.cached:
-                lines.append(
-                    (f"OCR  {ocr.count} rgn  async ~{ocr.inference_time_ms:.0f}ms", secondary)
-                )
-            else:
-                lines.append(
-                    (f"OCR  {ocr.count} rgn  {ocr.inference_time_ms:.0f}ms", secondary)
-                )
-        if extra_info:
-            for k, v in extra_info.items():
-                lines.append((f"{k}: {v}", secondary))
-
-        for i, (text, color) in enumerate(lines):
-            cv2.putText(
-                frame, text, (x, y + i * line_height),
-                _FONT, 0.45, color, 1, _LINE,
+            stat_lines.append(
+                (f"DET  {df.count} obj  {df.inference_time_ms:.0f}ms", black)
             )
+        if ocr and ocr.count > 0:
+            tag = (
+                f"(cached ~{ocr.inference_time_ms:.0f}ms)"
+                if ocr.cached
+                else f"{ocr.inference_time_ms:.0f}ms"
+            )
+            stat_lines.append((f"OCR  {ocr.count} rgn  {tag}", black))
+        elif ocr and ocr.cached:
+            stat_lines.append((f"OCR  async ~{ocr.inference_time_ms:.0f}ms", gray))
+        if extra_info and "lat" in extra_info:
+            stat_lines.append((f"LAT  {extra_info['lat']}", black))
+
+        header_scale = scale * 0.72
+        header = "HUD STATS"
+        (hw, hh), hbaseline = cv2.getTextSize(header, _FONT, header_scale, 1)
+
+        metrics: list[tuple[str, tuple[int, int, int], int, int, int]] = []
+        max_width = hw
+        content_height = hh + hbaseline + line_gap
+        for text, color in stat_lines:
+            (tw, th), baseline = cv2.getTextSize(text, _FONT, scale, thickness)
+            metrics.append((text, color, tw, th, baseline))
+            max_width = max(max_width, tw)
+            content_height += th + baseline + line_gap
+
+        panel_w = min(max_width + padding * 2, int(frame.shape[1] * 0.55))
+        panel_h = min(content_height + padding * 2, int(frame.shape[0] * 0.45))
+
+        # Top-left, below the phone Menu pill (~48px)
+        x0 = margin
+        y0 = margin + 48
+
+        self._draw_menu_style_box(frame, x0, y0, panel_w, panel_h)
+
+        y = y0 + padding
+        cv2.putText(
+            frame,
+            header,
+            (x0 + padding, y + hh),
+            _FONT,
+            header_scale,
+            gray,
+            1,
+            _LINE,
+        )
+        y += hh + hbaseline + line_gap
+
+        for text, color, _tw, th, baseline in metrics:
+            y += th
+            cv2.putText(
+                frame,
+                text,
+                (x0 + padding, y),
+                _FONT,
+                scale,
+                color,
+                thickness,
+                _LINE,
+            )
+            y += baseline + line_gap
 
     # ------------------------------------------------------------------
     # FPS tracking

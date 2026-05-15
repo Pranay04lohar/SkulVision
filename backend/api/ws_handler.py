@@ -111,7 +111,19 @@ class WebSocketHandler:
     ) -> None:
         """Continuously receive bytes from the client and enqueue them."""
         while True:
-            data = await websocket.receive_bytes()
+            message = await websocket.receive()
+            if message["type"] == "websocket.disconnect":
+                break
+            data = message.get("bytes")
+            if not data:
+                continue
+            if len(data) < 100:
+                logger.debug(
+                    "frame_too_small",
+                    client_id=client_id,
+                    bytes=len(data),
+                )
+                continue
             await processor.submit_frame(data)
 
     async def _send_loop(
@@ -120,11 +132,20 @@ class WebSocketHandler:
         processor: FrameProcessor,
         client_id: str,
     ) -> None:
-        """Pace rendered frame transmission at TARGET_FPS."""
-        interval = 1.0 / self._settings.TARGET_FPS
+        """Send rendered frames as fast as the pipeline produces them (up to TARGET_FPS)."""
+        min_interval = 1.0 / self._settings.TARGET_FPS
+        last_sent = 0.0
 
         while True:
             result = await processor.next_result()
-            if result is not None:
-                await websocket.send_bytes(result)
-            await asyncio.sleep(interval)
+            if result is None:
+                await asyncio.sleep(0.01)
+                continue
+
+            loop = asyncio.get_running_loop()
+            elapsed = loop.time() - last_sent
+            if elapsed < min_interval:
+                await asyncio.sleep(min_interval - elapsed)
+
+            await websocket.send_bytes(result)
+            last_sent = loop.time()

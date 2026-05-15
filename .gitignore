@@ -64,3 +64,9 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Mobile (Expo / React Native)
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/.env
