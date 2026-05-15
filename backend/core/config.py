@@ -46,9 +46,15 @@ class Settings(BaseSettings):
     OCR_LANGUAGES: str = "en"  # comma-separated, e.g. "en,hi"
     OCR_ENABLED: bool = True
     OCR_MIN_CONFIDENCE: float = 0.5
+    # Minimum seconds between background OCR jobs (never blocks the video path)
+    OCR_MIN_INTERVAL_SEC: float = 2.0
+    # Downscale frame before EasyOCR (full-res OCR is ~10x slower on CPU)
+    OCR_MAX_DIMENSION: int = 480
+    # CLAHE + sharpen helps accuracy but costs ~20–40ms per frame
+    OCR_ENHANCE: bool = False
 
     # --- Streaming ---
-    MAX_FRAME_DIMENSION: int = 1280
+    MAX_FRAME_DIMENSION: int = 960
     TARGET_FPS: int = 20
     FRAME_QUEUE_SIZE: int = 5
     JPEG_QUALITY: int = 85
@@ -74,6 +80,13 @@ class Settings(BaseSettings):
             raise ValueError(f"TARGET_FPS must be between 1 and 120, got {v}")
         return v
 
+    @field_validator("OCR_MIN_INTERVAL_SEC")
+    @classmethod
+    def validate_ocr_interval_sec(cls, v: float) -> float:
+        if v < 0.5:
+            raise ValueError(f"OCR_MIN_INTERVAL_SEC must be >= 0.5, got {v}")
+        return v
+
     @property
     def ocr_language_list(self) -> list[str]:
         return [lang.strip() for lang in self.OCR_LANGUAGES.split(",") if lang.strip()]
@@ -93,3 +106,9 @@ def get_settings() -> Settings:
     if _settings is None:
         _settings = Settings()
     return _settings
+
+
+def reset_settings() -> None:
+    """Clear cached settings (call on startup after .env is in place)."""
+    global _settings
+    _settings = None

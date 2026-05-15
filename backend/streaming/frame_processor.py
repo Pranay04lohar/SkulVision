@@ -79,6 +79,12 @@ class FrameProcessor:
             return None
 
         raw_bytes = await self._queue.get()
+        # Always process the newest frame — skip stale backlog for real-time HUD
+        while not self._queue.empty():
+            try:
+                raw_bytes = self._queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
 
         try:
             frame = self._compositor.decode_frame(raw_bytes)

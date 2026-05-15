@@ -19,6 +19,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+import cv2
 import numpy as np
 
 from backend.core.config import get_settings
@@ -86,11 +87,17 @@ class EasyOCREngine:
                 "EasyOCR not loaded. Call load() first."
             )
 
-        processed = self._preprocessor.enhance_for_ocr(frame) if enhance else frame
+        use_enhance = enhance and self._settings.OCR_ENHANCE
+        processed = self._preprocessor.enhance_for_ocr(frame) if use_enhance else frame
+        ocr_frame, coord_scale = self._downscale_for_ocr(processed)
 
         t0 = time.perf_counter()
         try:
-            raw_results = self._reader.readtext(processed)
+            raw_results = self._reader.readtext(
+                ocr_frame,
+                paragraph=False,
+                batch_size=1,
+            )
         except Exception as exc:
             raise OCRError(f"EasyOCR inference failed: {exc}") from exc
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -101,15 +108,33 @@ class EasyOCREngine:
                 continue
             if not text.strip():
                 continue
+            points = [[float(p[0]) * coord_scale, float(p[1]) * coord_scale] for p in bbox]
             regions.append(
                 TextRegion(
                     text=text.strip(),
                     confidence=float(confidence),
-                    bbox_points=[[float(p[0]), float(p[1])] for p in bbox],
+                    bbox_points=points,
                 )
             )
 
         return OCRFrame(regions=regions, inference_time_ms=elapsed_ms)
+
+    def _downscale_for_ocr(self, frame: np.ndarray) -> tuple[np.ndarray, float]:
+        """
+        Resize for OCR inference; return frame and multiplier to map boxes
+        back to original pixel coordinates.
+        """
+        max_dim = self._settings.OCR_MAX_DIMENSION
+        h, w = frame.shape[:2]
+        longest = max(h, w)
+        if longest <= max_dim:
+            return frame, 1.0
+
+        scale = max_dim / longest
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        resized = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        return resized, 1.0 / scale
 
     @property
     def is_loaded(self) -> bool:

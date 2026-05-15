@@ -1,8 +1,8 @@
 """
 Structured logging configuration.
 
-Uses structlog for structured, context-aware logging.
-Outputs human-readable format to TTY and JSON in production.
+Uses structlog with the stdlib logging bridge so processors like
+add_logger_name work correctly (PrintLoggerFactory does not expose .name).
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ def configure_logging(log_level: str = "INFO") -> None:
     is_tty = sys.stderr.isatty()
 
     shared_processors: list[Any] = [
+        structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.PositionalArgumentsFormatter(),
@@ -33,24 +34,32 @@ def configure_logging(log_level: str = "INFO") -> None:
         renderer = structlog.processors.JSONRenderer()
 
     structlog.configure(
-        processors=[*shared_processors, renderer],
-        context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(),
-        wrapper_class=structlog.BoundLogger,
+        processors=[
+            *shared_processors,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
 
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=getattr(logging, log_level.upper(), logging.INFO),
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(
+        structlog.stdlib.ProcessorFormatter(
+            foreign_pre_chain=shared_processors,
+            processors=[renderer],
+        )
     )
 
-    # Suppress noisy third-party loggers
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.addHandler(handler)
+    root.setLevel(getattr(logging, log_level.upper(), logging.INFO))
+
     for noisy in ("uvicorn.access", "websockets.server"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
-def get_logger(name: str) -> Any:
+def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """Return a bound structlog logger for the given module name."""
     return structlog.get_logger(name)

@@ -31,7 +31,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.router import configure as configure_router
 from backend.api.router import router
 from backend.api.ws_handler import WebSocketHandler
-from backend.core.config import get_settings
+from backend.core.config import get_settings, reset_settings
 from backend.core.logging_config import configure_logging, get_logger
 from backend.inference.model_manager import get_model_manager
 from backend.pipeline.orchestrator import PipelineOrchestrator
@@ -47,6 +47,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Everything before the yield runs at startup.
     Everything after the yield runs at shutdown.
     """
+    reset_settings()
     settings = get_settings()
     configure_logging(settings.LOG_LEVEL)
 

@@ -51,6 +51,7 @@ class OCRFrame:
 
     regions: list[TextRegion] = field(default_factory=list)
     inference_time_ms: float = 0.0
+    cached: bool = False  # True when served from async cache, not this frame's run
 
     @property
     def texts(self) -> list[str]:

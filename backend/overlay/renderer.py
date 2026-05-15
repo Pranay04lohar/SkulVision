@@ -161,7 +161,14 @@ class HUDRenderer:
         if df:
             lines.append((f"DET  {df.count} obj  {df.inference_time_ms:.0f}ms", secondary))
         if ocr:
-            lines.append((f"OCR  {ocr.count} rgn  {ocr.inference_time_ms:.0f}ms", secondary))
+            if ocr.cached:
+                lines.append(
+                    (f"OCR  {ocr.count} rgn  async ~{ocr.inference_time_ms:.0f}ms", secondary)
+                )
+            else:
+                lines.append(
+                    (f"OCR  {ocr.count} rgn  {ocr.inference_time_ms:.0f}ms", secondary)
+                )
         if extra_info:
             for k, v in extra_info.items():
                 lines.append((f"{k}: {v}", secondary))
