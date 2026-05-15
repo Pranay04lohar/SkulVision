@@ -1,0 +1,56 @@
+# ============================================================
+# SkulVision Backend — Python Dependencies
+# Phase 1: Core Prototype Foundation
+# ============================================================
+
+# --- Web Framework & Server ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9       # required for form/file uploads
+websockets>=12.0              # used by test scripts
+
+# --- Configuration & Validation ---
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.1
+
+# --- Computer Vision ---
+opencv-python>=4.9.0.80
+numpy>=1.26.4
+Pillow>=10.3.0
+
+# --- ONNX Runtime (CPU default) ---
+# For GPU: replace with onnxruntime-gpu==<same version>
+onnxruntime>=1.18.0
+
+# --- PyTorch (CPU default; used for future model exports) ---
+# For CUDA: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+torch>=2.3.0
+torchvision>=0.18.0
+
+# --- Object Detection model export ---
+ultralytics>=8.2.0            # provides `yolo export` CLI
+
+# --- OCR ---
+easyocr>=1.7.1
+
+# --- Async utilities ---
+aiofiles>=23.2.1
+
+# --- Structured Logging ---
+structlog>=24.2.0
+
+# ============================================================
+# Optional / Phase 2+
+# ============================================================
+# mediapipe>=0.10.14           # hand/face/pose landmarks
+# paddlepaddle>=2.6.0          # PaddleOCR backend
+# paddleocr>=2.7.0
+# openai-whisper>=20231117     # voice interaction
+
+# ============================================================
+# Development & Testing
+# ============================================================
+pytest>=8.2.0
+pytest-asyncio>=0.23.6
+httpx>=0.27.0                 # async test client for FastAPI
