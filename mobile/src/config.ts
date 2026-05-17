@@ -7,7 +7,7 @@
 export const BACKEND_PORT = 8000;
 
 export const DEFAULT_BACKEND_HOST =
-  process.env.EXPO_PUBLIC_BACKEND_HOST ?? "192.168.0.106";
+  process.env.EXPO_PUBLIC_BACKEND_HOST ?? "192.168.0.111";
 
 /** Target send rate for the video-style snapshot pump. */
 export const TARGET_CAPTURE_FPS = 12;
@@ -35,7 +35,7 @@ export type ParsedBackend = {
  * Accepts: 192.168.0.5 | 192.168.0.5:8000 | http://192.168.0.5:8000 | /192.168.0.5
  */
 export function parseBackendHost(input: string): ParsedBackend {
-  let s = input.trim();
+  let s = input.trim().replace(/\s+/g, "");
   s = s.replace(/^wss?:\/\//i, "");
   s = s.replace(/^https?:\/\//i, "");
   s = s.replace(/^\/+/, "");
